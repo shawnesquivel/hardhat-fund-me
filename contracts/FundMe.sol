@@ -5,6 +5,7 @@ pragma solidity ^0.8.7;
 // Imports the Price converter and attach to uint256
 
 import "./PriceConverter.sol";
+import "hardhat/console.sol";
 
 error FundMe__NotOwner();
 
@@ -40,6 +41,7 @@ contract FundMe {
     constructor(address priceFeedAddress) {
         priceFeed = AggregatorV3Interface(priceFeedAddress);
         i_owner = msg.sender; //whoever deploys the contract
+        console.log("The contract is deployed by:", msg.sender);
     }
 
     // Special functions - 1 max - receive() & fallback()

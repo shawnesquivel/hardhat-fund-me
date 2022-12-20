@@ -75,7 +75,7 @@ describe("FundMe", async function () {
     })
 
     // REVIEW THIS - IMPORTANT!!
-    describe("Withdraw", async function () {
+    describe("Withdraw ETH", async function () {
         // fund the contract
         beforeEach(async function () {
             await fundMe.fund({ value: sendValue })
@@ -122,48 +122,65 @@ describe("FundMe", async function () {
         })
 
         it("allows us to withdraw with multiple funders", async function () {
+            // ARRANGE - CONNECT ACCOUNTS AND FUND THE CONTRACT
+
+            // creates an array of fake accounts
             const accounts = await ethers.getSigners()
 
             for (let i = 1; i < 6; i++) {
-                accounts[i]
+                // connect each account to FundMe contract
+                const fundMeConnectedContract = await fundMe.connect(
+                    accounts[i]
+                )
+                await fundMeConnectedContract.fund({ value: sendValue })
             }
-
-            await fundMeConnectedContract.fund({ value: sendValue })
-
+            // contract balance
             const startingFundMeBalance = await fundMe.provider.getBalance(
                 fundMe.address
             )
+            // owner balance
             const startingDeployerBalance = await fundMe.provider.getBalance(
                 deployer
             )
 
+            // ACT - WITHDRAW MONEY
             const transactionResponse = await fundMe.withdraw()
-
             const transactionReceipt = await transactionResponse.wait(1)
 
-            const endingFundMeBalance = await fundMe.provider.getBalance(
-                fundMe.address
-            )
+            const { gasUsed, effectiveGasPrice } = transactionReceipt
+
+            // ASSERT 1 - CHECK BALANCES
+
+            // Ending Deployer (99) + Gas Cost (1) = Starting Contract (100) + Starting Deployer (0)
+            // Gas Cost = Gas Used * Gas Price
             const endingDeployerBalance = await fundMe.provider.getBalance(
                 deployer
             )
 
-            assert.equal(endingFundMeBalance, 0)
-            // Ending_Balance = Starting_Contract + Starting_Balance - Gas Fees
+            const totalGasCost = gasUsed.mul(effectiveGasPrice)
             assert.equal(
-                startingFundMeBalance
-                    .add(startingDeployerBalance)
-                    .sub(gasSpent),
-                endingDeployerBalance.toString()
+                startingFundMeBalance,
+                endingDeployerBalance
+                    .sub(startingDeployerBalance)
+                    .add(totalGasCost)
+                    .toString()
             )
 
+            // ASSERT 2 - FUNDERS ARRAY IS RESET AFTER WITHDRAWING BALANCES
             await expect(fundMe.funders(0)).to.be.reverted
 
-            for (i = 1; i < 6; i++) {
+            // ASSERT 3 - Check that each account's funded amount is zero
+            console.log("Hello")
+            for (let i = 1; i < 6; i++) {
                 assert.equal(
-                    await fundMe.addressToAmountFunded(accounts[i].address)
+                    await fundMe.addressToAmountFunded(accounts[i].address),
+                    0
                 )
             }
+        })
+
+        it("only allows the owner to withdraw", async function () {
+            const accounts = ethers.getSigners()
         })
     })
 })
