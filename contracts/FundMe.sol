@@ -22,10 +22,10 @@ contract FundMe {
     using PriceConverter for uint256;
 
     // State Variables
-    mapping(address => uint256) public addressToAmountFunded;
-    address[] public funders;
+    mapping(address => uint256) public s_addressToAmountFunded;
+    address[] public s_funders;
     address public immutable i_owner;
-    AggregatorV3Interface public priceFeed;
+    AggregatorV3Interface public s_priceFeed;
     uint256 public constant MIN_USD = 0.02 * 1e18;
 
     // modifier - extract one line to a single keyword
@@ -39,7 +39,7 @@ contract FundMe {
 
     // gets called immediately w hen you run FundMe
     constructor(address priceFeedAddress) {
-        priceFeed = AggregatorV3Interface(priceFeedAddress);
+        s_priceFeed = AggregatorV3Interface(priceFeedAddress);
         i_owner = msg.sender; //whoever deploys the contract
         console.log("The contract is deployed by:", msg.sender);
     }
@@ -66,26 +66,26 @@ contract FundMe {
         // 1*10^18 gwei = 1 ETH
         // require (getConversionRate(msg.value) >= MIN_USD, "Did not reach min. 1ETH fund");
         require(
-            msg.value.getConversionRate(priceFeed) >= MIN_USD,
+            msg.value.getConversionRate(s_priceFeed) >= MIN_USD,
             "Did not reach min. 1ETH fund"
         );
 
         // revert - undoes any actions and sends gas back
-        addressToAmountFunded[msg.sender] += msg.value;
-        funders.push(msg.sender);
+        s_addressToAmountFunded[msg.sender] += msg.value;
+        s_funders.push(msg.sender);
     }
 
     function withdraw() public onlyOwner {
         for (
             uint256 funderIndex = 0;
-            funderIndex < funders.length;
+            funderIndex < s_funders.length;
             funderIndex++
         ) {
-            address funder = funders[funderIndex];
-            addressToAmountFunded[funder] = 0;
+            address funder = s_funders[funderIndex];
+            s_addressToAmountFunded[funder] = 0;
         }
         // reset array
-        funders = new address[](0);
+        s_funders = new address[](0);
 
         // withdraw funds
         // transfer
@@ -100,5 +100,20 @@ contract FundMe {
         // send
         // bool sendSuccess = payable(msg.sender).send(address(this).balance);
         // require(sendSuccess, "Sorry, the send failed");
+    }
+
+    function chaeperWithdraw() public payable onlyOwner {
+        address[] memory funders = s_funders;
+        for (
+            uint256 funderIndex = 0;
+            funderIndex < funders.length;
+            funderIndex++
+        ) {
+            address funder = funders[funderIndex];
+            s_addressToAmountFunded[funder] = 0;
+        }
+        s_funders = new address[](0);
+        (bool success, ) = i_owner.call{value: address(this).balance}("");
+        require(success);
     }
 }
